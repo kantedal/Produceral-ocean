@@ -1,0 +1,20 @@
+newmtl ROWBOAT1:ROWBOAT_BODY_SG
+illum 4
+Kd 1.00 1.00 1.00
+Ka 1.00 1.00 1.00
+Tf 1.00 1.00 1.00
+map_Kd ROWBAOT_DIFFUSE.jpg
+Ni 1.00
+newmtl ROWBOAT1:ROWBOAT_CLOTH_SG
+illum 4
+Kd 0.50 0.50 0.50
+Ka 0.50 0.50 0.50
+Tf 1.00 1.00 1.00
+map_Kd CLOTH_DIFFUSE.jpg
+Ni 1.00
+newmtl ROWBOAT1:lambert5SG
+illum 4
+Kd 0.50 0.50 0.50
+Ka 0.50 0.50 0.50
+Tf 1.00 1.00 1.00
+Ni 1.00
