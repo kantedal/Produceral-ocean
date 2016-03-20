@@ -323,7 +323,7 @@ WAGNER.MultiPassBloomPass = function( w, h ) {
 	this.width = w || 512;
 	this.height = h || 512;
 
-	this.params.blurAmount = 0.4;
+	this.params.blurAmount = 0.2;
 	this.params.applyZoomBlur = false;
 	this.params.zoomBlurStrength = 3.5;
 	this.params.useTexture = false;

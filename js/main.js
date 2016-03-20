@@ -35,7 +35,7 @@ function init(){
 	ocean_plane = new THREE.Mesh( ocean_geometry, ocean_material );
 	scene.add( ocean_plane );
 
-	var geometry   = new THREE.SphereGeometry(18, 32, 32)
+	var geometry   = new THREE.SphereGeometry(25, 32, 32)
 	var skyMesh = new THREE.Mesh(geometry, ocean_material)
 	scene.add(skyMesh);
 
@@ -43,7 +43,7 @@ function init(){
     var cloud_material = new THREE.SpriteMaterial( { map: map, color: 0xffffff, fog: true } );
      for(var c=0; c<10; c++){
         var angle = -Math.random()*Math.PI*2;
-        var length = Math.sqrt(Math.random())*7;
+        var length = Math.sqrt(Math.random())*5;
         var x_val = Math.cos(angle)*length;
         var y_val = Math.sin(angle)*length;
         var z_val = 3 + Math.random()*5;
@@ -104,6 +104,6 @@ function render(){
 	composer.reset();
 	composer.render( scene, camera );
 	//composer.pass( multiPassBloomPass );
-	composer.pass( dofPass );
+	//composer.pass( dofPass );
 	composer.toScreen();
 }
