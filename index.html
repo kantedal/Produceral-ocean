@@ -1,1 +1,306 @@
-My Page
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset=utf-8>
+		<title>Procedural ocean</title>
+		<style>
+			body { margin: 0; }
+			canvas { width: 100%; height: 100% }
+		</style>
+	</head>
+	<body>
+
+		<script src="js/three.min.js"></script>
+		<script src="js/XHRLoader.js"></script>
+		<script src="http://threejs.org/examples/js/loaders/DDSLoader.js"></script>
+		<script src="http://threejs.org/examples/js/loaders/MTLLoader.js"></script>
+		<script src="http://threejs.org/examples/js/loaders/OBJLoader.js"></script>
+		<script src="js/wagner.js"></script>
+		<script src="js/wagner.base.js"></script>
+
+		<script type="x-shader/x-vertex" id="vertexWaterShader">
+			const float EPSILON	= 0.001;
+
+	       	varying vec2 vUv;
+	       	varying vec3 vCameraPosition;
+	       	varying vec3 vToCamera;
+	       	varying vec3 vPosition;
+	       	varying float vTime;
+
+	       	uniform float time;
+	       	mat2 octave_m = mat2(1.6,1.2,-1.2,1.6);
+
+	       	const float SEA_FREQ = 0.15;
+	       	const float SEA_AMPLITUDE = 0.6;
+
+	       	// float getHeight(vec2 pos){
+	       	// 	return sin((pos[0]*pos[1])/8.0+2.0*time)/3.0;
+	       	// }
+
+	       	float hash( vec2 p ) {
+				float h = dot(p,vec2(127.1,311.7));	
+			    return fract(sin(h)*43758.5453123);
+			}
+
+	       	float noise( in vec2 p ) {
+			    vec2 i = floor( p );
+			    vec2 f = fract( p );	
+				vec2 u = f*f*(3.0-2.0*f);
+			    return -1.0+2.0*mix( mix( hash( i + vec2(0.0,0.0) ), 
+			                     hash( i + vec2(1.0,0.0) ), u.x),
+			                mix( hash( i + vec2(0.0,1.0) ), 
+			                     hash( i + vec2(1.0,1.0) ), u.x), u.y);
+			}
+
+	       	// sea
+			float sea_octave(vec2 uv, float choppy) {
+			    uv += noise(uv);        
+			    vec2 wv = 1.0-abs(sin(uv));
+			    vec2 swv = abs(cos(uv));    
+			    wv = mix(wv,swv,wv);
+			    return pow(1.0-pow(wv.x * wv.y,0.65),choppy);
+			}
+
+			float map(vec3 p) {
+			    float freq = SEA_FREQ;
+			    float amp = SEA_AMPLITUDE;
+			    float choppy = 2.0;
+			    vec2 uv = p.xy; uv.x *= 0.75;
+			    
+			    float d, h = 0.0;    
+			    for(int i = 0; i < 3; i++) {        
+			    	d = sea_octave((uv+time)*freq,choppy);
+			    	d += sea_octave((uv-time)*freq,choppy);
+			        h += d * amp;   
+
+			    	uv *= octave_m; 
+			    	freq *= 1.9; 
+			    	amp *= 0.22;
+
+			        choppy = mix(choppy,1.0,0.2);
+			    }
+			    return p.z - h;
+			}
+
+			float map_detailed(vec3 p) {
+			    float freq = SEA_FREQ;
+			    float amp = 0.6;
+			    float choppy = 4.0;
+			    vec2 uv = p.xy; uv.x *= 0.75;
+			    
+			    float d, h = 0.0;    
+			    for(int i = 0; i < 3; i++) {
+			    	d = sea_octave((uv+time)*freq,choppy);
+			    	d += sea_octave((uv-time)*freq,choppy);
+			        h += d * amp;   
+
+			    	uv *= octave_m; 
+			    	freq *= 1.9; 
+			    	amp *= 0.22;
+
+			        choppy = mix(choppy,1.0,0.2);
+			    }
+			    return p.z - h;
+			}
+
+			vec3 getNormal(vec3 p, float eps) {
+			    vec3 n;
+			    n.z = map_detailed(p);    
+			    n.x = map_detailed(vec3(p.x+eps,p.y,p.z)) - n.z;
+			    n.y = map_detailed(vec3(p.x,p.y+eps,p.z)) - n.z;
+			    n.z = EPSILON;
+			    return normalize(n);
+			}
+
+			void main() {
+
+			    vUv = uv; 
+			    vTime = time;
+			    vPosition = position;
+			    vToCamera = normalize(cameraPosition - position);
+			    vCameraPosition = cameraPosition;
+			    //vNormal = normalize(vec3(sin(position[0]*position[1]+time*1.0), sin(position[0]*position[1]+time*2.0), sin(position[0]*position[1]+time*3.0)));
+
+			    //vNormal = cross(vec3(position[0]+EPSILON, position[1], getHeight(vec2(position[0]+EPSILON, position[1]))), vec3(position[0], position[1]+EPSILON, getHeight(vec2(position[0], position[1]+EPSILON))));
+			    vec3 dist = position - cameraPosition;
+			   	//vNormal = getNormal(position);
+
+			    float height = map(position);
+
+			    //position[2] = sin(position[0]*position[1]);
+			    gl_Position = projectionMatrix * modelViewMatrix * vec4( vec3(position[0], position[1], height), 1.0 );
+
+			}
+	    </script>
+
+	    <script type="x-shader/x-vertex" id="fragmentWaterShader">
+	        varying vec2 vUv;
+	        varying vec3 vCameraPosition;
+	        varying vec3 vToCamera;
+	        varying vec3 vPosition;
+	        varying float vTime;
+
+	        vec3 light = vec3(0.0, 1.0, 0.6);
+
+	        vec3 u_lightAmbientIntensity =  vec3(0.3, 0.3, 0.4);
+		 	vec3 u_lightDiffuseIntensity = vec3(0.2, 0.7, 1.0);
+			vec3 u_lightSpecularIntensity = vec3(1.0, 1.0, 1.0);
+
+			vec3 u_matAmbientReflectance = vec3(0.3, 0.3, 0.4);
+			vec3 u_matDiffuseReflectance = vec3(0.0, 0.8, 0.7);
+			vec3 u_matSpecularReflectance = vec3(0.9, 0.9, 0.9);
+
+			float u_matShininess = 10.0;
+
+			mat2 octave_m = mat2(1.6,1.2,-1.2,1.6);
+
+			const float EPSILON	= 0.00001;
+	       	const float SEA_FREQ = 0.15;
+
+			vec3 ambientLighting()
+			{
+			   return u_matAmbientReflectance * u_lightAmbientIntensity;
+			}
+
+			vec3 diffuseLighting(in vec3 N, in vec3 L)
+			{
+			   float diffuseTerm = clamp(dot(N, L), 0.0, 1.0) ;
+			   return u_matDiffuseReflectance * u_lightDiffuseIntensity * diffuseTerm;
+			}
+
+			vec3 specularLighting(in vec3 N, in vec3 L, in vec3 V)
+			{
+			   float specularTerm = 0.0;
+
+			   if(dot(N, L) > 0.0)
+			   {
+			      vec3 H = normalize(L + V);
+			      specularTerm = pow(dot(N, H), u_matShininess);
+			   }
+			   return u_matSpecularReflectance * u_lightSpecularIntensity * specularTerm;
+			}
+
+			// sky
+			vec3 getSkyColor(vec3 e) {
+			    e.y = max(e.y,0.0);
+			    vec3 ret;
+			    ret.x = pow(1.0-e.y,2.0);
+			    ret.y = 1.0-e.y;
+			    ret.z = 0.6+(1.0-e.y)*0.4;
+			    return ret;
+			}
+
+			// lighting
+			float diffuse(vec3 n,vec3 l,float p) {
+			    return pow(dot(n,l) * 0.4 + 0.6,p);
+			}
+			float specular(vec3 n,vec3 l,vec3 e,float s) {    
+			    float nrm = (s + 8.0) / (3.1415 * 8.0);
+			    return pow(max(dot(reflect(e,n),l),0.0),s) * nrm;
+			}
+
+			// vec3 getSeaColor(vec3 p, vec3 n, vec3 l, vec3 eye, vec3 dist) {
+			//     float fresnel = 1.0 - max(dot(n,-eye),0.0);
+			//     fresnel = pow(fresnel,3.0) * 0.65;
+
+			//     vec3 reflected = getSkyColor(reflect(eye,n));
+			//     vec3 refracted = SEA_BASE + diffuse(n,l,80.0) * SEA_WATER_COLOR * 0.12;
+
+			//     vec3 color = mix(refracted,reflected,fresnel);
+
+			//     float atten = max(1.0 - dot(dist,dist) * 0.001, 0.0);
+			//     color += SEA_WATER_COLOR * (p.y - SEA_HEIGHT) * 0.18 * atten;
+
+			//     color += vec3(specular(n,l,eye,60.0));
+
+			//     return color;
+			// }
+
+			float hash( vec2 p ) {
+				float h = dot(p,vec2(127.1,311.7));	
+			    return fract(sin(h)*43758.5453123);
+			}
+
+	       	float noise( in vec2 p ) {
+			    vec2 i = floor( p );
+			    vec2 f = fract( p );	
+				vec2 u = f*f*(3.0-2.0*f);
+			    return -1.0+2.0*mix( mix( hash( i + vec2(0.0,0.0) ), 
+			                     hash( i + vec2(1.0,0.0) ), u.x),
+			                mix( hash( i + vec2(0.0,1.0) ), 
+			                     hash( i + vec2(1.0,1.0) ), u.x), u.y);
+			}
+
+	       	// sea
+			float sea_octave(vec2 uv, float choppy) {
+			    uv += noise(uv);        
+			    vec2 wv = 1.0-abs(sin(uv));
+			    vec2 swv = abs(cos(uv));    
+			    wv = mix(wv,swv,wv);
+			    return pow(1.0-pow(wv.x * wv.y,0.65),choppy);
+			}
+
+			float map_detailed(vec3 p) {
+			    float freq = SEA_FREQ;
+			    float amp = 0.6;
+			    float choppy = 2.0;
+			    vec2 uv = p.xy; uv.x *= 0.75;
+			    
+			    float d, h = 0.0;    
+			    for(int i = 0; i < 5; i++) {
+			    	d = sea_octave((uv+vTime)*freq,choppy);
+			    	d += sea_octave((uv-vTime)*freq,choppy);
+			        h += d * amp;   
+
+			    	uv *= octave_m; 
+			    	freq *= 1.9; 
+			    	amp *= 0.23;
+
+			        choppy = mix(choppy,1.0,0.2);
+			    }
+			    return p.z - h;
+			}
+
+			vec3 getNormal(vec3 p, float eps) {
+			    vec3 n;
+			    n.z = map_detailed(p);    
+			    n.x = map_detailed(vec3(p.x+eps,p.y,p.z)) - n.z;
+			    n.y = map_detailed(vec3(p.x,p.y+eps,p.z)) - n.z;
+			    n.z = EPSILON;
+			    return normalize(n);
+			}
+
+			void main() {
+				vec3 vNormal = getNormal(vPosition, EPSILON);
+
+				vec3 L = normalize(light);
+				vec3 V = normalize(vToCamera);
+				vec3 N = normalize(vNormal);
+
+				vec3 amb = ambientLighting();
+				vec3 dif = diffuseLighting(N, L);
+				vec3 spec = specularLighting(N, L, V);
+
+				vec3 diffuseColor = vec3(0.65, 0.65, 0.6);
+
+				
+				float distance = length(vCameraPosition-vPosition);
+
+				vec3 skyColor = vec3(0.2,0.6,0.8);
+				vec3 horizonColor = vec3(.8,.95,1.0);
+				float skyMix = exp(-pow(vPosition.z/10.0,2.0));
+
+				float fogIntensity = exp(-pow(distance/20.0,30.0));
+				//float colorMix = exp
+
+			   	vec3 color = fogIntensity*(diffuseColor * (amb+dif+spec)) + (1.0-fogIntensity)*(skyMix*horizonColor+(1.0-skyMix)*skyColor);
+			    gl_FragColor = vec4( pow(color,vec3(0.75)), 1.0 );
+
+			}
+    	</script>
+
+		<script src="js/vector.js"></script>
+		<script src="js/main.js"></script>
+
+	</body>
+</html>
